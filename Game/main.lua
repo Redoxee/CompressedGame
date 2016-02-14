@@ -120,6 +120,7 @@ love.draw = function()
 		love.graphics.print("Congratulation you achieved : " .. tostring(Points) .. " Points!" , 325,200)
 		love.graphics.print("Best score : " .. tostring(BestScore), 335,220)
 		love.graphics.print("Press R to restart", 375,240)
+		love.graphics.print("The 200 lines of codes for this game are here : https://github.com/Redoxee/CompressedGame/blob/master/Game/main.lua",4,380)
 	end
 end
 
@@ -148,10 +149,9 @@ updateEnemies = function(dt)
 end
 
 removeElement = function(list,index)
-	for i = index,#list - 1 do
+	for i = index,#list do
 		list[i] = list[i + 1]
 	end
-	list[#list] = nil
 end
 
 rectangleCollision = function(x1,y1,width1,height1,x2,y2,width2,height2) -- Simple aabb function
