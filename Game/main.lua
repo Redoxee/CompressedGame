@@ -26,10 +26,14 @@ SpawnTimer = 0
 EnemySize = 15
 EnemyMinSpeed,EnemyMaxSpeed = 90 , 180
 
+Labels = {}
+LabelDisplayTime = 1
+LabelSpeed = 30
+
 BestScore = "Loading"
 
 reset = function() -- dirty compressed reset
-	PosX,PosY,VelocityY,HasStomp,WasPressingStomp,LifePoints,BlinkTimer,Points,Multiplier,Enemies = 400,0,0,false,false,3,0,0,1,{}
+	PosX,PosY,VelocityY,HasStomp,WasPressingStomp,LifePoints,BlinkTimer,Points,Multiplier,Enemies,Labels = 400,0,0,false,false,3,0,0,1,{},{}
 end
 
 love.update = function(dt)
@@ -61,10 +65,11 @@ love.update = function(dt)
 		local hasHit = false
 		for i = #Enemies,1,-1 do
 			if rectangleCollision(PosX,PosY,CharacterSize,CharacterSize,Enemies[i].posX,Enemies[i].posY,EnemySize,EnemySize) then
-				removeEnemy(i)
+				removeElement(Enemies,i)
 				VelocityY = JumpForce
 				if HasStomp then
 					Points = Points + Multiplier
+					Labels[#Labels + 1] = {Text = tostring(Multiplier) , posX = PosX, posY = PosY, time = LabelDisplayTime}
 					Multiplier = Multiplier + 1
 				else
 					LifePoints = LifePoints - 1
@@ -77,6 +82,10 @@ love.update = function(dt)
 		end
 		if hasHit then HasStomp = false end
 		if BlinkTimer > 0 then BlinkTimer = BlinkTimer - dt end
+		for i= #Labels,1,-1 do
+			Labels[i].time = Labels[i].time - dt
+			if Labels[i].time <= 0 then removeElement(Labels,i) end
+		end
 	else
 		if love.keyboard.isDown("r") then reset() end
 	end
@@ -88,7 +97,6 @@ love.draw = function()
 	if LifePoints > 0 then
 		love.graphics.print("Life   : " .. tostring(LifePoints) , 15,15)
 		love.graphics.print("Points : " .. tostring(Points) .. " Multiplier : " .. tostring(Multiplier), 15 , 35)
-
 		if not (BlinkTimer > 0) or (math.sin(BlinkTimer * math.pi * 15) > .5) then
 			if HasStomp then
 				love.graphics.setColor(240,240,0)
@@ -98,11 +106,15 @@ love.draw = function()
 			local x,y = getPositionFromCamera(PosX,PosY)
 			love.graphics.rectangle("fill",x, y - CharacterSize,CharacterSize,CharacterSize)
 		end
-
 		love.graphics.setColor(255,65,40)
 		for i,enemy in ipairs(Enemies) do
 			local x,y = getPositionFromCamera(enemy.posX,enemy.posY)
 			love.graphics.rectangle("fill",x,y - EnemySize,EnemySize,EnemySize)
+		end
+		love.graphics.setColor(25,128,255)
+		for i,label in ipairs(Labels) do
+			local x,y = getPositionFromCamera(label.posX,label.posY + LabelSpeed * (1 - label.time / LabelDisplayTime) + CharacterSize + EnemySize)
+			love.graphics.print(label.Text,x,y)
 		end
 	else
 		love.graphics.print("Congratulation you achieved : " .. tostring(Points) .. " Points!" , 325,200)
@@ -121,26 +133,25 @@ updateEnemies = function(dt)
 		SpawnTimer = SpawnRate
 		local goRight = math.random() > .5
 		Enemies[#Enemies + 1] = {
-			goRight = goRight,
 			posY = math.random(0,50),
 			posX = goRight and -EnemySize or WindowWidth ,
-			speed = math.random(EnemyMinSpeed,EnemyMaxSpeed),
+			speed = math.random(EnemyMinSpeed,EnemyMaxSpeed) * (goRight and 1 or -1),
 		}
 	end
 	for i = #Enemies, 1, -1 do
 		local enemy = Enemies[i]
-		enemy.posX = enemy.posX + enemy.speed * dt * (enemy.goRight and 1 or -1)
- 		if (enemy.goRight and enemy.posX > WindowWidth) or (not enemy.goRight and enemy.posX < -EnemySize) then
- 			removeEnemy(i)
+		enemy.posX = enemy.posX + enemy.speed * dt 
+ 		if ((enemy.speed > 0) and enemy.posX > WindowWidth) or (not (enemy.speed > 0) and enemy.posX < -EnemySize) then
+ 			removeElement(Enemies,i)
  		end 
  	end
 end
 
-removeEnemy = function(index)
-	for i = index,#Enemies - 1 do
-		Enemies[i] = Enemies[i + 1]
+removeElement = function(list,index)
+	for i = index,#list - 1 do
+		list[i] = list[i + 1]
 	end
-	Enemies[#Enemies] = nil
+	list[#list] = nil
 end
 
 rectangleCollision = function(x1,y1,width1,height1,x2,y2,width2,height2) -- Simple aabb function
@@ -149,9 +160,6 @@ rectangleCollision = function(x1,y1,width1,height1,x2,y2,width2,height2) -- Simp
 end
 
 onGameOver = function()
-	queryBestScore()
-end
-queryBestScore = function()
 	if BestScore == "Loading" or (tonumber(BestScore) and tonumber(BestScore) < Points) then
 		local http = require("socket.http")
 		local b, c, h = http.request("http://antonroy.fr/content/CompressedGame/php/HighScore.php?Score=" .. tostring(Points))
@@ -183,3 +191,10 @@ end
 		echo $row['Score'];
 	}
 ?>--]]
+--[[function love.conf(t) -- conf.lua
+    t.version = "0.10.0"                -- The LÖVE version this game was made for (string)
+    t.window.title = "CompressedGame"        -- The window title (string)
+    t.window.resizable = false         -- Let the window be user-resizable (boolean)
+end--]]
+-- Thanks for reading :)
+-- Anton Roy Apache License 2.0 2016
