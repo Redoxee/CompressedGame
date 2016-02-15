@@ -18,6 +18,7 @@ StompForce = -320
 LifePoints = 3
 BlinkTimer = 0
 Points = 0
+BestCombo = 0
 Multiplier = 1
 
 Enemies = {}
@@ -29,15 +30,17 @@ EnemyMinSpeed,EnemyMaxSpeed = 90 , 180
 Labels = {}
 LabelDisplayTime = 1
 LabelSpeed = 30
-
 BestScore = "Loading"
 
+WasPressingReset = false
 reset = function() -- dirty compressed reset
-	PosX,PosY,VelocityY,HasStomp,WasPressingStomp,LifePoints,BlinkTimer,Points,Multiplier,Enemies,Labels = 400,0,0,false,false,3,0,0,1,{},{}
+	PosX,PosY,VelocityY,HasStomp,WasPressingStomp,LifePoints,BlinkTimer,Points,BestCombo,Multiplier,Enemies,Labels = 400,0,0,false,false,3,0,0,0,1,{},{}
 end
 
 love.update = function(dt)
 	if love.keyboard.isDown("escape") then love.event.push('quit') end
+	if not WasPressingReset and love.keyboard.isDown("r") then reset() end
+	WasPressingReset = love.keyboard.isDown("r")
 
 	if LifePoints > 0 then
 		local directionX = 0
@@ -70,6 +73,7 @@ love.update = function(dt)
 				if HasStomp then
 					Points = Points + Multiplier
 					Labels[#Labels + 1] = {Text = tostring(Multiplier) , posX = PosX, posY = PosY, time = LabelDisplayTime}
+					BestCombo = math.max(BestCombo,Multiplier)
 					Multiplier = Multiplier + 1
 				else
 					LifePoints = LifePoints - 1
@@ -86,8 +90,6 @@ love.update = function(dt)
 			Labels[i].time = Labels[i].time - dt
 			if Labels[i].time <= 0 then removeElement(Labels,i) end
 		end
-	else
-		if love.keyboard.isDown("r") then reset() end
 	end
 end
 
@@ -96,7 +98,7 @@ love.draw = function()
 	love.graphics.print("Left/Right to move | Up to jump | Down to stomp you'll crush only if you stomp",305,15)
 	if LifePoints > 0 then
 		love.graphics.print("Life   : " .. tostring(LifePoints) , 15,15)
-		love.graphics.print("Points : " .. tostring(Points) .. " Multiplier : " .. tostring(Multiplier), 15 , 35)
+		love.graphics.print("Points : " .. tostring(Points) .. " Multiplier : " .. tostring(Multiplier) .. " Best Combo : " .. BestCombo, 15 , 35)
 		if not (BlinkTimer > 0) or (math.sin(BlinkTimer * math.pi * 15) > .5) then
 			if HasStomp then
 				love.graphics.setColor(240,240,0)
@@ -117,7 +119,7 @@ love.draw = function()
 			love.graphics.print(label.Text,x,y)
 		end
 	else
-		love.graphics.print("Congratulation you achieved : " .. tostring(Points) .. " Points!" , 325,200)
+		love.graphics.print("Congratulation you achieved : " .. tostring(Points) .. " Points! \nYour best combo is " .. BestCombo , 300,185)
 		love.graphics.print("Best score : " .. tostring(BestScore), 335,220)
 		love.graphics.print("Press R to restart", 375,240)
 		love.graphics.print("The 200 lines of codes for this game are here : https://github.com/Redoxee/CompressedGame/blob/master/Game/main.lua",4,380)
@@ -160,9 +162,9 @@ rectangleCollision = function(x1,y1,width1,height1,x2,y2,width2,height2) -- Simp
 end
 
 onGameOver = function()
-	if BestScore == "Loading" or (tonumber(BestScore) and tonumber(BestScore) < Points) then
+	if BestScore == "Loading" or BestScore ~= "Can't load" then
 		local http = require("socket.http")
-		local b, c, h = http.request("http://antonroy.fr/content/CompressedGame/php/HighScore.php?Score=" .. tostring(Points))
+		local b, c, h = http.request("http://antonroy.fr/content/CompressedGame/php/HighScore.php?Score=" .. tostring(Points).."&BestCombo="..tostring(BestCombo))
 		if c == 200 then BestScore = b else BestScore = "Can't load" end
 	end
 end
@@ -173,22 +175,20 @@ end
 	$user = "stub";
 	$pwd = "stub";
 	$pdo = new PDO($dsn,$user,$pwd);
-	if (isset($_GET["Score"])){
-		$_GET["Score"] = htmlspecialchars ($_GET["Score"]);
+	$pdo = new PDO($dsn,$user,$pwd);
+	if (isset($_GET["Score"]) && isset($_GET["BestCombo"])){
 		$sql = 'SELECT * FROM HighScore WHERE id = 1;';
 		$rep = $pdo->query($sql);
-		if($rep->rowcount()){
-			$rep = $rep->fetch();
-			if($rep['Score'] < $_GET["Score"]){
-				$sql = 'UPDATE HighScore SET Score='.$_GET["Score"].' WHERE id = 1;';
-				$pdo->exec($sql);
-			}
-		}
+		$rep = $rep->fetch();
+		$_GET["Score"] = max(htmlspecialchars ($_GET["Score"]),$rep['Score']);
+		$_GET["BestCombo"] = max(htmlspecialchars ($_GET["BestCombo"]),$rep['BestCombo']);
+		$sql = 'UPDATE HighScore SET Score='.$_GET["Score"].', BestCombo = '.$_GET["BestCombo"].' WHERE id = 1;';
+		$pdo->exec($sql);
 	}
-	$sql = 'SELECT Score FROM HighScore;';
+	$sql = 'SELECT Score,BestCombo FROM HighScore;';
 	$rep = $pdo->query($sql);
 	foreach ($rep as $row) {
-		echo $row['Score'];
+		echo $row['Score'].", ".$row['BestCombo'];
 	}
 ?>--]]
 --[[function love.conf(t) -- conf.lua
